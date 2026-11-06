@@ -17,10 +17,13 @@ class Limits:
     batch_size: int = 20
     batch_cooldown_seconds: int = 3600
     interval_jitter_seconds: int = 15
+    max_actions: int | None = None
 
     def __post_init__(self) -> None:
         for field in fields(self):
             value = getattr(self, field.name)
+            if field.name == "max_actions" and value is None:
+                continue
             minimum = 0 if field.name == "interval_jitter_seconds" else 1
             if type(value) is not int or not minimum <= value <= 2_147_483_647:
                 raise ValueError(
@@ -48,8 +51,12 @@ class Limits:
             value = value.partition("#")[0].strip()
             if len(value) >= 2 and value[0] in "\"'" and value[0] == value[-1]:
                 value = value[1:-1]
+            if name == "max_actions" and value.lower() == "unlimited":
+                settings[name] = None
+                continue
             if not separator or not value.isdecimal():
-                raise ValueError(f"{path}: {key} must be a nonnegative integer")
+                allowed = "a positive integer or unlimited" if name == "max_actions" else "a nonnegative integer"
+                raise ValueError(f"{path}: {key} must be {allowed}")
             settings[name] = int(value)
         return cls(**settings)
 

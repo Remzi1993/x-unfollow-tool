@@ -46,10 +46,16 @@ Unfollow up to five accounts in a trial run.
 python unfollow.py YOUR_HANDLE --apply --max-actions 5
 ```
 
-To continue through the Following list, leave out `--max-actions`.
+By default, an apply run continues until X shows an empty Following list. It waits through the rolling limits and batch cooldowns, then resumes automatically.
 
 ```text
 python unfollow.py YOUR_HANDLE --apply
+```
+
+If you set a per-run cap in `.env`, use `--all` to run through the entire Following list. Pacing limits still apply.
+
+```text
+python unfollow.py YOUR_HANDLE --apply --all
 ```
 
 Keep Chrome, the Following tab, and the terminal open during a run. You can work in other tabs and apps. Press **Ctrl+C** in the terminal to stop. If a confirmation dialog is still open, dismiss it before restarting. Rerun the command to continue with the same pacing history. Chrome and its tabs stay open when the tool exits.
@@ -58,11 +64,12 @@ The tool stops on a rate-limit response, an account restriction message, or an u
 
 ## Pacing
 
-Edit `.env` to change the local pacing limits. Use positive integers for the limits and intervals. Set jitter to `0` to disable it.
+Edit `.env` to change the pacing limits or per-run cap. Set `UNFOLLOW_MAX_ACTIONS` to a positive integer to cap a run. An unset value defaults to `unlimited`. Use positive integers for the other limits and intervals. Set jitter to `0` to disable it.
 
 | Setting | Default | What it controls |
 | --- | ---: | --- |
 | `UNFOLLOW_DAILY_LIMIT` | 400 | Maximum attempts in a rolling 24-hour window, estimated from X's daily following cap |
+| `UNFOLLOW_MAX_ACTIONS` | `unlimited` | Optional cap on successful unfollows in one run, overridden by `--max-actions` or `--all` |
 | `UNFOLLOW_HOURLY_LIMIT` | 30 | Maximum attempts in a rolling 60-minute window |
 | `UNFOLLOW_MIN_INTERVAL_SECONDS` | 30 | Minimum time between attempts |
 | `UNFOLLOW_INTERVAL_JITTER_SECONDS` | 15 | Maximum random delay added to the minimum interval |
@@ -71,6 +78,6 @@ Edit `.env` to change the local pacing limits. Use positive integers for the lim
 
 With the defaults, the tool waits 30–45 seconds between attempts when budgets allow. It samples an extra delay uniformly from 0 to 15 seconds and saves it with each attempt so it survives a restart. A cap or batch cooldown can extend the wait.
 
-The tool tracks its attempts per handle in `db.sqlite3` in the repository directory. It counts an attempt before acting so an interruption or unconfirmed result still consumes that slot. Actions taken elsewhere are outside this local history.
+The tool saves each attempt and its sampled jitter by handle in `db.sqlite3` in the repository directory. This history preserves the rolling limits, cooldowns, and spacing across restarts. It counts an attempt before acting so an interruption or unconfirmed result still consumes that slot. The per-run cap counts only confirmed unfollows from the current invocation. Actions taken elsewhere are outside this local history.
 
 The unfollow settings here are local budgets. X prohibits scripting its website and automated bulk unfollowing, and randomized pacing cannot guarantee avoiding detection or enforcement. [X follow limits](https://help.x.com/en/using-x/x-follow-limit) · [X automation rules](https://help.x.com/en/rules-and-policies/x-automation)

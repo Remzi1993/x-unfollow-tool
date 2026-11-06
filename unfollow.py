@@ -204,13 +204,17 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("handle", help="Your signed-in X handle")
     parser.add_argument("--apply", action="store_true", help="Unfollow accounts. Default is a read-only preview.")
-    parser.add_argument("--max-actions", type=int, help="Stop after this many successful unfollows")
+    run_limit = parser.add_mutually_exclusive_group()
+    run_limit.add_argument("--max-actions", type=int, help="Override the configured per-run limit")
+    run_limit.add_argument("--all", dest="run_all", action="store_true", help="Continue until the Following list is empty")
     args = parser.parse_args()
     handle = args.handle.removeprefix("@").lower()
     if not HANDLE.fullmatch(handle):
         parser.error("handle must contain 1–15 letters, digits, or underscores")
-    if args.max_actions is not None and (not args.apply or args.max_actions < 1):
-        parser.error("--max-actions requires --apply and a positive integer")
+    if not args.apply and (args.run_all or args.max_actions is not None):
+        parser.error("--max-actions and --all require --apply")
+    if args.max_actions is not None and args.max_actions < 1:
+        parser.error("--max-actions must be a positive integer")
 
     try:
         limits = Limits.from_env()
@@ -226,7 +230,12 @@ def main() -> int:
             tab.check_ready()
             tab.column.wait_for(state="visible", timeout=UI_TIMEOUT)
             if args.apply:
-                run(tab, Pacer(handle, limits), args.max_actions)
+                max_actions = None if args.run_all else args.max_actions or limits.max_actions
+                if max_actions is None:
+                    print("Running until X shows an empty Following list.", flush=True)
+                else:
+                    print(f"This run can unfollow up to {max_actions} accounts.", flush=True)
+                run(tab, Pacer(handle, limits), max_actions)
             else:
                 print(f"Preview for @{handle}. Found {tab.buttons.count()} rendered unfollow controls.")
         return 0
